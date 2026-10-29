@@ -94,21 +94,23 @@ class Enrollment(models.Model):
     rating = models.FloatField(default=5.0)
 
 
+
 class Question(models.Model):
     course = models.ForeignKey(Course, on_delete=models.CASCADE)
-    # Establishing a many-to-many relationship as a question can belong to one or more lessons and a lesson can have many questions
-    lessons =  models.ManyToManyField(Lesson)
+    # Establishing a many-to-many relationship as a question can belong to one or more lessons
+    lessons = models.ManyToManyField(Lesson)
     question_text = models.CharField(max_length=500)
     question_point = models.IntegerField(default=1)
 
-    def is_get_grade(self, selected_ids):
-        """ this function checks if the student successfully chose all the right answers """
+    def __str__(self):
+        return self.question_text
+
+    def is_get_score(self, selected_ids):
+        """ Returns True if the student chose all the correct answers for this question """
         all_answers = self.choice_set.filter(is_correct=True).count()
         selected_correct = self.choice_set.filter(is_correct=True, id__in=selected_ids).count()
-        if all_answers == selected_correct:
-            return True
-        else:
-            return False
+        return all_answers == selected_correct
+
 
 class Choice(models.Model):
     # Has a one-to-many relationship with Question model
@@ -116,8 +118,15 @@ class Choice(models.Model):
     choice_text = models.CharField(max_length=200)
     is_correct = models.BooleanField(default=False)
 
+    def __str__(self):
+        return self.choice_text
+
+
 class Submission(models.Model):
-   # One enrollment can have multiple submissions
-   enrollment = models.ForeignKey(Enrollment, on_delete=models.CASCADE)
-   # A submission can have multiple choices and a choice can belong to multiple submissions
-   choices = models.ManyToManyField(Choice)
+    # One enrollment can have multiple submissions
+    enrollment = models.ForeignKey(Enrollment, on_delete=models.CASCADE)
+    # A submission can have multiple choices and a choice can belong to multiple submissions
+    choices = models.ManyToManyField(Choice)
+
+    def __str__(self):
+        return f"Submission {self.id} by {self.enrollment.user.username}"

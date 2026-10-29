@@ -102,14 +102,32 @@ def enroll(request, course_id):
 
 
 def extract_answers(request):
-   submitted_answers = []
-   for key in request.POST:
-       if key.startswith('choice'):
-           value = request.POST[key]
-           choice_id = int(value)
-           choice = get_object_or_404(Choice, pk=choice_id)
-           submitted_answers.append(choice)
-   return submitted_answers
+    submitted_answers = []
+    for key in request.POST:
+        if key.startswith('choice'):
+            value = request.POST[key]
+            choice_id = int(value)
+            choice = get_object_or_404(Choice, pk=choice_id)
+            submitted_answers.append(choice)
+    return submitted_answers
+
+
+def submit(request, course_id):
+    # identify the user and the course by course_id
+    user = request.user
+    course = get_object_or_404(Course, pk=course_id)
+    # get the enrollment object
+    enrollment = Enrollment.objects.get(user=user, course=course)
+    # create a submission object based on the enrollment object
+    new_submission = Submission.objects.create(enrollment=enrollment)
+
+    # capture the selected choices on the exam form
+    selected_choices = extract_answers(request)
+    # add these choices to the submission object
+    new_submission.choices.add(*selected_choices)
+    new_submission.save()
+
+    return redirect(reverse('onlinecourse:show_exam_result', args=(course.id, new_submission.id)))
 
 
 def show_exam_result(request, course_id, submission_id):
@@ -123,36 +141,19 @@ def show_exam_result(request, course_id, submission_id):
     selected_choices = submission.choices.all()
     questions = course.question_set.all()
 
-    # calculate maximum points 
-    max_points = sum([q.question_point for q in questions])
+    # calculate total possible points
+    possible = sum([q.question_point for q in questions])
     student_score = 0
     # calculate the points achieved by the student
     for question in questions:
-        if question.is_get_grade(selected_choices):
+        if question.is_get_score(selected_choices):
             student_score += question.question_point
-    # calculate the grade
-    grade = int(student_score/max_points * 100)
-    
+    # calculate the grade percentage
+    grade = int(student_score / possible * 100) if possible > 0 else 0
+
     context['grade'] = grade
+    context['possible'] = possible
+    context['student_score'] = student_score
     context['selected_ids'] = selected_choices
     context['course'] = course
     return render(request, 'onlinecourse/exam_result_bootstrap.html', context)
-        
-
-
-def submit(request, course_id):
-    # identify the user and the course by course_id
-    user = request.user
-    course = get_object_or_404(Course, pk=course_id)
-    # get the enrollment object 
-    enrollment = Enrollment.objects.get(user=user, course=course)
-    # create a submission object based on the enrollment object
-    new_submission = Submission.objects.create(enrollment=enrollment)
-
-    # capture the selected choices on the exam form
-    selected_choices = extract_answers(request)
-    # add these choices to the submission object
-    new_submission.choices.add(*selected_choices)
-    new_submission.save()
-
-    return redirect(reverse('onlinecourse:show_exam_result', args=(course.id, new_submission.id)))
